@@ -2,9 +2,9 @@ import React from 'react';
 import GoogleMapReact from 'google-map-react';
 import  { useParams } from "react-router-dom";
 import { database } from 'src/lib/firebase';
-import { string } from 'prop-types';
-
-const AnyReactComponent = ({ text, lat, lng }: { text: string, lat: number, lng: number }) => <div>{text}</div>;
+ import { calculateAndDisplayRoute} from "./helpers/directions";
+ 
+const DriverMarker = ({ text, lat, lng }: { text: string, lat: number, lng: number }) => <div><img src="https://www.cyclestreets.net/images/categories/iconsets/cyclestreets/svg/track_neutral.svg" width="30" height="30"/></div>;
 
 interface ITrackingInfo {
   current_location: {
@@ -14,7 +14,7 @@ interface ITrackingInfo {
   location_detail: {
     distance: string
     duration: string
-    star_address: string
+    start_address: string
     end_address: string
   }
 }
@@ -22,10 +22,12 @@ interface ITrackingInfo {
 const Map =() => { 
 const { tracking_number } = useParams();
 const [trackingInfo, setTrackingInfo] = React.useState<ITrackingInfo | null>(null);
+
+/**
+ * Firebase database listener order_tracker
+ */
 const getTrackerData = () => { 
-
     const starCountRef = database.ref(`/order_tracker/`).child(tracking_number);
-
     starCountRef.on('value', function(snapshot) {
         console.log( snapshot.val())
         if(snapshot.val()){
@@ -34,16 +36,26 @@ const getTrackerData = () => {
     }); 
 }
 
+const handleGoogleLoad = React.useCallback(({map, maps}) => { 
+  const directionsService = new maps.DirectionsService();
+  const directionsRenderer = new maps.DirectionsRenderer();
+  const origin = trackingInfo?.location_detail?.start_address;
+  const destination = trackingInfo?.location_detail?.end_address
+  calculateAndDisplayRoute(directionsService, directionsRenderer, maps, origin, destination);
+  directionsRenderer.setMap(map);
+}, [trackingInfo])
+
 React.useEffect(()=>{
     getTrackerData()
 },[]);
+ 
 
   const mapConfig = {
     center: {
       lat: trackingInfo?.current_location?.lat || 0,
       lng: trackingInfo?.current_location?.lng || 0
     },
-    zoom: 13
+    zoom: 15
   };  
 
     return (
@@ -53,11 +65,13 @@ React.useEffect(()=>{
           bootstrapURLKeys={{ key: process.env.REACT_APP_GOOGLE_MAP_API || "" }}
           defaultCenter={mapConfig.center}
           defaultZoom={mapConfig.zoom}
+          onGoogleApiLoaded={handleGoogleLoad}
+          yesIWantToUseGoogleMapApiInternals
         >
-          <AnyReactComponent
+          <DriverMarker
             lat={trackingInfo?.current_location?.lat}
             lng={trackingInfo?.current_location?.lng}
-            text="Driver"
+            text="DriverMarker"
           />
         </GoogleMapReact>}
       </div>
